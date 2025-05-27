@@ -1,4 +1,4 @@
-from typing import TypedDict, Any, List, Dict
+from typing import TypedDict, Any, List, Dict, Union, Optional
 import os
 import datetime
 from dotenv import load_dotenv
@@ -131,9 +131,9 @@ def update_user_name(phone_number: str, name: str) -> bool:
         print(traceback.format_exc())
         return False
 
-def get_user_from_db(phone_number: str) -> User | None:
+def get_user_from_db(phone_number: str) -> Union[User, None]:
     try:
-        last_doc: Any | None = callers_collection.find_one(filter={"phone_number": phone_number}, sort=[("_id", DESCENDING)])
+        last_doc: Optional[Any] = callers_collection.find_one(filter={"phone_number": phone_number}, sort=[("_id", DESCENDING)])
         if last_doc:
             logger.info(f"User found: {phone_number}")
             return last_doc
@@ -218,7 +218,7 @@ def get_symptom_from_db() -> str:
         logger.error(f"Unexpected error while retrieving symptom: {e}")
         return "Error retrieving note from database"
     
-def get_temperature_from_db() -> float | None:
+def get_temperature_from_db() -> Optional[float]:
     try:
         last_temp_doc = temperature_collection.find_one(sort=[("_id", DESCENDING)])
         if last_temp_doc:
