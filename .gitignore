@@ -1,25 +1,5 @@
-# Dependencies
-node_modules/
-venv/
-__pycache__/
-*.pyc
-
-# Environment variables
 .env
-.env.local
-.env.*.local
 
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Build outputs
+.parcel-cache/
 dist/
-build/
-*.log 
+node_modules/
