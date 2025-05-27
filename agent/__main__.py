@@ -54,7 +54,7 @@ def read_root() -> dict[str, str]:
 
 @app.post("/agent/pizza/{id}")
 async def pizza_status(id: str) -> dict[str, str]:
-    return {"note": "The pizza guy's number is 234. Do you want cheese or pepperoni?"}
+    return {"message": "The pizza guy's number is 234. Do you want cheese or pepperoni?"}
 
 @app.post(path="/agent/init")
 async def init(request: Request) -> Dict[str, Any]:
