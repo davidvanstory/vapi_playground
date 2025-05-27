@@ -2,7 +2,7 @@
 #
 from fastapi import FastAPI, Request, Response
 import requests
-from typing import Literal, Any, Dict, Union
+from typing import Literal, Any, Dict, Union, List, Optional
 import logging
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
@@ -11,6 +11,7 @@ import base64
 from .utils.cloudinary import cloudinary
 import os
 from requests.auth import HTTPBasicAuth
+from pydantic import BaseModel
 
 from agent.helpers import (
     User, get_user_from_db, save_user, save_symptom, get_symptom_from_db, 
@@ -38,6 +39,23 @@ app.add_middleware(
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+class DTMFMessage(BaseModel):
+    type: Literal["request-start"]
+    blocking: bool
+    conditions: Optional[List[Dict[str, Any]]] = None
+    content: str
+    contents: Optional[List[Dict[str, Any]]] = None
+
+class DTMFResponse(BaseModel):
+    type: Literal["dtmf"]
+    createdAt: datetime
+    id: str
+    orgId: str
+    updatedAt: datetime
+    async_: bool = False
+    function: Dict[str, Any]
+    messages: List[DTMFMessage]
+
 @app.get("/")
 def read_root() -> dict[str, str]:
     return {}
@@ -53,16 +71,45 @@ def read_root() -> dict[str, str]:
     return {"note": "The pizza guy's number is 234. Do you want cheese or pepperoni?"}
 
 @app.post("/agent/pizza/{id}")
-async def pizza_status(id: str) -> dict:
-    return {
-        "messages": [
-            {
-                "type": "request-start",
-                "blocking": False,
-                "content": "The pizza guy's number is 234. Do you want cheese or pepperoni?"
+async def pizza_status(id: str) -> DTMFResponse:
+    current_time = datetime.utcnow()
+    return DTMFResponse(
+        type="dtmf",
+        createdAt=current_time,
+        id=id,
+        orgId="default_org",  # You may want to make this configurable
+        updatedAt=current_time,
+        async_=False,
+        function={
+            "name": "pizza_status",
+            "strict": True,
+            "description": "Get pizza order status",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "id": {
+                        "type": "string",
+                        "description": "Pizza order ID"
+                    }
+                },
+                "required": ["id"]
             }
+        },
+        messages=[
+            DTMFMessage(
+                type="request-start",
+                blocking=False,
+                content="The pizza guy's number is 234. Do you want cheese or pepperoni?",
+                contents=[
+                    {
+                        "type": "text",
+                        "text": "The pizza guy's number is 234. Do you want cheese or pepperoni?",
+                        "language": "en"
+                    }
+                ]
+            )
         ]
-    }
+    )
 
 @app.post(path="/agent/init")
 async def init(request: Request) -> Dict[str, Any]:
