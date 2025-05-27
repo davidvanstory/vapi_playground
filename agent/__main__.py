@@ -57,8 +57,9 @@ async def pizza_status(id: str) -> dict:
     return {
         "messages": [
             {
-                "type": "text",
-                "text": "The pizza guy's number is 234. Do you want cheese or pepperoni?"
+                "type": "request-start",
+                "blocking": False,
+                "content": "The pizza guy's number is 234. Do you want cheese or pepperoni?"
             }
         ]
     }
