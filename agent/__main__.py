@@ -557,6 +557,15 @@ async def get_all_images() -> Dict[str, Any]:
 
 @app.post("/agent/take-pain")
 async def take_pain(request: Request) -> Dict[str, Any]:
+    body = await request.json()
+    print(body)  # For debugging
+
+    # Extract toolCallId as before
+    tool_call_id = (
+        body.get("toolCallId") or
+        body.get("tool_call_id") or
+        (body.get("message", {}).get("toolCalls", [{}])[0].get("id"))
+    )
     try:
         request_body = await request.json()
         pain = float(request_body['pain'])
@@ -566,7 +575,7 @@ async def take_pain(request: Request) -> Dict[str, Any]:
         if save_pain(pain, phone_number):
             return {
                 "status": "success",
-                "message": f"Pain saved successfully: {pain}°F"
+                "message": f"Pain saved successfully: {pain}"
             }
         else:
             return {
