@@ -567,24 +567,55 @@ async def take_pain(request: Request) -> Dict[str, Any]:
         (body.get("message", {}).get("toolCalls", [{}])[0].get("id"))
     )
     try:
-        request_body = await request.json()
-        pain = float(request_body['pain'])
-        phone_number = request_body.get('phone_number')  # Optional, if you want to associate with user
+        # Try to extract pain value from different possible locations in the request
+        pain = None
+        
+        # Check if pain is in the direct request body
+        if "pain" in body:
+            pain = float(body["pain"])
+        # Check if pain is in the message.toolCalls structure
+        elif "message" in body and "toolCalls" in body["message"]:
+            tool_calls = body["message"]["toolCalls"]
+            if tool_calls and "function" in tool_calls[0]:
+                arguments = tool_calls[0]["function"].get("arguments", {})
+                if isinstance(arguments, str):
+                    # If arguments is a string, try to parse it as JSON
+                    try:
+                        arguments = json.loads(arguments)
+                    except json.JSONDecodeError:
+                        pass
+                if isinstance(arguments, dict) and "pain" in arguments:
+                    pain = float(arguments["pain"])
 
+        if pain is None:
+            raise ValueError("No pain value found in request")
+
+        phone_number = body.get('phone_number')  # Optional, if you want to associate with user
         logger.info(f"Pain received: {pain} for user: {phone_number}")
+        
         if save_pain(pain, phone_number):
-            return {
-                "status": "success",
-                "message": f"Pain saved successfully: {pain}"
-            }
+            result_msg = f"Pain level {pain} saved successfully"
         else:
-            return {
-                "status": "error",
-                "message": "Failed to save pain to database"
-            }
+            result_msg = "Failed to save pain to database"
+
+        return {
+            "results": [
+                {
+                    "toolCallId": tool_call_id,
+                    "result": result_msg
+                }
+            ]
+        }
     except Exception as e:
         logger.error(f"Error saving pain: {str(e)}")
-        return {"status": "error", "message": f"Server error: {str(e)}"}
+        return {
+            "results": [
+                {
+                    "toolCallId": tool_call_id,
+                    "result": f"Error saving pain: {str(e)}"
+                }
+            ]
+        }
     
 
 @app.get("/agent/get-all-pains")
