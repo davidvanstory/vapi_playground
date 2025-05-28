@@ -71,45 +71,8 @@ def read_root() -> dict[str, str]:
     return {"note": "The pizza guy's number is 234. Do you want cheese or pepperoni?"}
 
 @app.post("/agent/pizza/{id}")
-async def pizza_status(id: str) -> DTMFResponse:
-    current_time = datetime.utcnow()
-    return DTMFResponse(
-        type="dtmf",
-        createdAt=current_time,
-        id=id,
-        orgId="default_org",  # You may want to make this configurable
-        updatedAt=current_time,
-        async_=False,
-        function={
-            "name": "pizza_status",
-            "strict": True,
-            "description": "Get pizza order status",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "id": {
-                        "type": "string",
-                        "description": "Pizza order ID"
-                    }
-                },
-                "required": ["id"]
-            }
-        },
-        messages=[
-            DTMFMessage(
-                type="request-start",
-                blocking=False,
-                content="The pizza guy's number is 234. Do you want cheese or pepperoni?",
-                contents=[
-                    {
-                        "type": "text",
-                        "text": "The pizza guy's number is 234. Do you want cheese or pepperoni?",
-                        "language": "en"
-                    }
-                ]
-            )
-        ]
-    )
+async def pizza_status(id: str) -> str:
+    return "The pizza guy's number is 234. Do you want cheese or pepperoni?"
 
 @app.post(path="/agent/init")
 async def init(request: Request) -> Dict[str, Any]:
