@@ -85,8 +85,6 @@ async def pizza_tool(request: Request) -> dict:
         ]
     }
 
-
-
 @app.post(path="/agent/init")
 async def init(request: Request) -> Dict[str, Any]:
     try:
@@ -350,26 +348,36 @@ async def get_symptom(request: Request) -> dict[str, str]:
 
 # added for temp taking
 @app.post("/agent/take-temperature")
-async def take_temperature(request: Request) -> Dict[str, Any]:
+async def take_temperature(request: Request) -> dict:
+    body = await request.json()
+    print(body)  # Add this line for debugging
+    # Try to extract toolCallId from multiple possible locations
+    tool_call_id = (
+        body.get("toolCallId") or
+        body.get("tool_call_id") or
+        (body.get("message", {}).get("toolCalls", [{}])[0].get("id"))
+    )
     try:
-        request_body = await request.json()
-        temperature = float(request_body['temperature'])
-        phone_number = request_body.get('phone_number')  # Optional, if you want to associate with user
+        temperature = float(body["temperature"])
+        phone_number = body.get('phone_number')  # Optional, if you want to associate with user
 
         logger.info(f"Temperature received: {temperature} for user: {phone_number}")
         if save_temp(temperature, phone_number):
-            return {
-                "status": "success",
-                "message": f"Temperature saved successfully: {temperature}°F"
-            }
+            result_msg = f"Temperature saved successfully: {temperature}°F"
         else:
-            return {
-                "status": "error",
-                "message": "Failed to save temperature to database"
-            }
+            result_msg = "Failed to save temperature to database"
     except Exception as e:
         logger.error(f"Error saving temperature: {str(e)}")
-        return {"status": "error", "message": f"Server error: {str(e)}"}
+        result_msg = f"Server error: {str(e)}"
+
+    return {
+        "results": [
+            {
+                "toolCallId": tool_call_id,
+                "result": result_msg
+            }
+        ]
+    }
 
 @app.get("/agent/get-temperature")
 async def get_temperature(request: Request) -> Dict[str, Any]:
