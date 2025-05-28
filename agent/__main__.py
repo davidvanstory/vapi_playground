@@ -28,9 +28,9 @@ app = FastAPI()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Remove "*"
+    allow_origins=["http://localhost:3000", "https://davids-test-voice-agent-067858f03c32.herokuapp.com"],
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
     expose_headers=["*"],
 )
@@ -257,22 +257,30 @@ async def update_name(request: Request) -> Dict[str, Any]:
 @app.post("/agent/take-symptom")
 async def take_symptom(request: Request) -> Dict[str, Any]:
     try:
-        request_body = await request.json()
-        logger.info(f"Full request body for take-symptom: {request_body}")  # Add detailed logging
-        
-        if 'symptom' not in request_body:
-            logger.warning("Missing 'symptom' field in request")
-            return {"status": "error", "message": "Missing 'symptom' field in request"}
-        
-        symptom = request_body['symptom']
-        
+        body = await request.json()
+        print(body)  # For debugging
+
+        # Extract toolCallId from multiple possible locations
+        tool_call_id = (
+            body.get("toolCallId") or
+            body.get("tool_call_id") or
+            (body.get("message", {}).get("toolCalls", [{}])[0].get("id"))
+        )
+
+        # Try to extract symptom from possible locations
+        symptom = (
+            body.get("symptom") or
+            body.get("Symptom") or
+            body.get("message", {}).get("toolCalls", [{}])[0].get("function", {}).get("arguments", {}).get("symptom")
+        )
+
         # Check all possible sources for caller_id
         caller_id = None
         
         # 1. Try request body under different possible keys
         for key in ['caller_id', 'phone_number', 'user_id', 'from']:
-            if key in request_body and request_body[key]:
-                caller_id = request_body[key]
+            if key in body and body[key]:
+                caller_id = body[key]
                 logger.info(f"Found caller_id in request body with key '{key}': {caller_id}")
                 break
         
@@ -294,43 +302,42 @@ async def take_symptom(request: Request) -> Dict[str, Any]:
             latest_user = callers_collection.find_one(sort=[("_id", -1)])
             if latest_user:
                 caller_id = latest_user.get("phone_number")
-                
-        
+                logger.info(f"Using most recent caller: {caller_id}")
+            else:
+                logger.warning("No callers in database and no caller_id provided")
+                raise ValueError("Could not determine caller ID from any source")
+
         logger.info(f"Final caller_id to be used: {caller_id}")
-        
+
         if not symptom or not isinstance(symptom, str):
-            logger.warning(f"Invalid symptom format: {symptom}")
-            return {"status": "error", "message": f"Invalid symptom format: {symptom}"}
+            raise ValueError("No valid symptom provided in request.")
+
+        logger.info(f"Symptom received: {symptom} for user: {caller_id}")
         
-        logger.info(f"Attempting to save symptom: {symptom} for user: {caller_id}")
         if save_symptom(symptom, caller_id):
-            logger.info("Symptom saved successfully")
-            # Only check for persistent cough if the current symptom is a cough
+            result_msg = f"Symptom saved successfully: {symptom}"
+            
+            # Check for persistent cough if the symptom is cough-related
             if "cough" in symptom.lower():
                 is_persistent = check_persistent_symptom(caller_id, "cough")
                 logger.info(f"Checking for persistent cough. Result: {is_persistent}")
                 if is_persistent:
-                    return {
-                        "status": "success",
-                        "message": "Symptom saved successfully",
-                        "conversation_config_override": {
-                            "agent": {
-                                "prompt": [{"prompt": "The patient has a bad cough. Recommend seeing a doctor."}],
-                                "first_message": "Since your cough has been lingering, what do you think about setting up a doctors appointment. Shall we go ahead and set that up?"
-                            }
-                        }
-                    }
-            return {
-                "status": "success", 
-                "message": f"Symptom saved successfully: {symptom}"
-            }
+                    result_msg = "Since your cough has been lingering, what do you think about setting up a doctors appointment. Shall we go ahead and set that up?"
         else:
-            logger.error("Failed to save symptom to database")
-            return {"status": "error", "message": "Failed to save symptom to database"}
-    except Exception as e:
-        logger.error(f"Error in take_symptom endpoint: {str(e)}")
-        return {"status": "error", "message": f"Server error: {str(e)}"}
+            result_msg = "Failed to save symptom to database"
 
+    except Exception as e:
+        logger.error(f"Error saving symptom: {str(e)}")
+        result_msg = f"Server error: {str(e)}"
+
+    return {
+        "results": [
+            {
+                "toolCallId": tool_call_id,
+                "result": result_msg
+            }
+        ]
+    }
 
 @app.get("/agent/get-symptom")
 async def get_symptom(request: Request) -> dict[str, str]:
