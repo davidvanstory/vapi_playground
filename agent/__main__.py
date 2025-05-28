@@ -66,13 +66,19 @@ def read_root() -> dict[str, str]:
         "message": "Hello Petah"
     }
 
-@app.get("/agent/pizza")
-def read_root() -> dict[str, str]:
-    return {"note": "The pizza guy's number is 234. Do you want cheese or pepperoni?"}
+@app.post("/agent/pizza")
+async def pizza_tool(request: Request) -> dict:
+    body = await request.json()
+    tool_call_id = body.get("toolCallId", "")
+    return {
+        "results": [
+            {
+                "toolCallId": tool_call_id,
+                "result": "The pizza guy's number is 234. Do you want cheese or pepperoni?"
+            }
+        ]
+    }
 
-@app.post("/agent/pizza/{id}")
-async def pizza_status(id: str) -> str:
-    return "The pizza guy's number is 234. Do you want cheese or pepperoni?"
 
 @app.post(path="/agent/init")
 async def init(request: Request) -> Dict[str, Any]:
