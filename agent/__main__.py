@@ -69,6 +69,7 @@ def read_root() -> dict[str, str]:
 @app.post("/agent/pizza")
 async def pizza_tool(request: Request) -> dict:
     body = await request.json()
+    print(body)  # Add this line for debugging
     # Try to extract toolCallId from multiple possible locations
     tool_call_id = (
         body.get("toolCallId") or
