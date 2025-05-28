@@ -350,17 +350,28 @@ async def get_symptom(request: Request) -> dict[str, str]:
 @app.post("/agent/take-temperature")
 async def take_temperature(request: Request) -> dict:
     body = await request.json()
-    print(body)  # Add this line for debugging
-    # Try to extract toolCallId from multiple possible locations
+    print(body)  # For debugging
+
+    # Extract toolCallId as before
     tool_call_id = (
         body.get("toolCallId") or
         body.get("tool_call_id") or
         (body.get("message", {}).get("toolCalls", [{}])[0].get("id"))
     )
-    try:
-        temperature = float(body["temperature"])
-        phone_number = body.get('phone_number')  # Optional, if you want to associate with user
 
+    # Try to extract temperature from possible locations
+    temperature = (
+        body.get("temperature") or
+        body.get("Temperature") or
+        body.get("temp") or
+        body.get("message", {}).get("toolCalls", [{}])[0].get("function", {}).get("arguments", {}).get("temperature")
+    )
+    phone_number = body.get("phone_number")
+
+    try:
+        if temperature is None:
+            raise ValueError("No temperature value provided in request.")
+        temperature = float(temperature)
         logger.info(f"Temperature received: {temperature} for user: {phone_number}")
         if save_temp(temperature, phone_number):
             result_msg = f"Temperature saved successfully: {temperature}°F"
