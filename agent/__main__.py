@@ -69,8 +69,12 @@ def read_root() -> dict[str, str]:
 @app.post("/agent/pizza")
 async def pizza_tool(request: Request) -> dict:
     body = await request.json()
-    print(body)  # Add this line for debugging
-    tool_call_id = body.get("toolCallId", "")
+    # Try to extract toolCallId from multiple possible locations
+    tool_call_id = (
+        body.get("toolCallId") or
+        body.get("tool_call_id") or
+        (body.get("message", {}).get("toolCalls", [{}])[0].get("id"))
+    )
     return {
         "results": [
             {
@@ -80,9 +84,7 @@ async def pizza_tool(request: Request) -> dict:
         ]
     }
 
-@app.post("/agent/pizza/{id}")
-async def pizza_status(id: str) -> str:
-    return "The pizza guy's number is 234. Do you want cheese or pepperoni?"
+
 
 @app.post(path="/agent/init")
 async def init(request: Request) -> Dict[str, Any]:
