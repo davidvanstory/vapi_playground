@@ -358,7 +358,6 @@ async def take_temperature(request: Request) -> dict:
         body.get("tool_call_id") or
         (body.get("message", {}).get("toolCalls", [{}])[0].get("id"))
     )
-
     # Try to extract temperature from possible locations
     temperature = (
         body.get("temperature") or
@@ -390,18 +389,43 @@ async def take_temperature(request: Request) -> dict:
         ]
     }
 
-@app.get("/agent/get-temperature")
+@app.post("/agent/get-temperature")
 async def get_temperature(request: Request) -> Dict[str, Any]:
-    temperature = get_temperature_from_db()
-    if temperature is None:
+    try:
+        body = await request.json()
+        print(body)  # For debugging
+
+        # Extract toolCallId as before
+        tool_call_id = (
+            body.get("toolCallId") or
+            body.get("tool_call_id") or
+            (body.get("message", {}).get("toolCalls", [{}])[0].get("id"))
+        )
+
+        temperature = get_temperature_from_db()
+        if temperature is None:
+            result_msg = "No temperature data available"
+        else:
+            result_msg = f"Current temperature: {temperature}°F"
+
         return {
-            "status": "error",
-            "message": "No temperature data available"
+            "results": [
+                {
+                    "toolCallId": tool_call_id,
+                    "result": result_msg
+                }
+            ]
         }
-    return {
-        "status": "success",
-        "temperature": temperature
-    }
+    except Exception as e:
+        logger.error(f"Error in get_temperature endpoint: {str(e)}")
+        return {
+            "results": [
+                {
+                    "toolCallId": tool_call_id if 'tool_call_id' in locals() else None,
+                    "result": f"Error retrieving temperature: {str(e)}"
+                }
+            ]
+        }
 
 @app.get("/agent/get-all-temperatures")
 async def get_all_temperatures() -> Dict[str, Any]:
